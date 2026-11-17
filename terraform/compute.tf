@@ -61,9 +61,10 @@ resource "aws_instance" "fleet" {
   }
 
   tags = {
-    Name = format("%s-%02d", var.project, count.index + 1)
-    Role = "fleet"
-    OS   = var.os
+    Name        = format("%s-%02d", var.project, count.index + 1)
+    Role        = "fleet"
+    OS          = var.os
+    Environment = "lab"
   }
 
   lifecycle {
