@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and set your GitHub username.
+github_owner = "your-github-username"
+github_repo  = "hardened-rhel-fleet"
+region       = "us-east-1"

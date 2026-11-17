@@ -1,0 +1,21 @@
+---
+# Order matters: SSH is allowed in the target zone before that zone becomes the default,
+# so the play never cuts off its own connection.
+- name: Allow required services in the target zone
+  ansible.posix.firewalld:
+    zone: "{{ hardening_firewall_zone }}"
+    service: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ hardening_firewall_services }}"
+
+- name: Read the default firewall zone
+  ansible.builtin.command: firewall-cmd --get-default-zone
+  register: hardening_zone_current
+  changed_when: false
+
+- name: Make the target zone the default
+  ansible.builtin.command: firewall-cmd --set-default-zone={{ hardening_firewall_zone }}
+  when: hardening_zone_current.stdout | trim != hardening_firewall_zone
+  changed_when: true

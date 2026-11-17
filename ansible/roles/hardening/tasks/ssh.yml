@@ -1,0 +1,34 @@
+---
+# RHEL 9 reads /etc/ssh/sshd_config.d/*.conf first and the first value wins,
+# so a low-numbered drop-in overrides the vendor defaults without editing them.
+- name: Write the SSH hardening drop-in
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (role: hardening)
+      {% for key, value in hardening_sshd_settings | dictsort %}
+      {{ key }} {{ value }}
+      {% endfor %}
+    dest: /etc/ssh/sshd_config.d/00-hardening.conf
+    owner: root
+    group: root
+    mode: "0600"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload sshd
+
+- name: Restrict the main SSH daemon config to root
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Read the system-wide crypto policy
+  ansible.builtin.command: update-crypto-policies --show
+  register: hardening_crypto_current
+  changed_when: false
+
+- name: Set the system-wide crypto policy
+  ansible.builtin.command: update-crypto-policies --set {{ hardening_crypto_policy }}
+  when: hardening_crypto_current.stdout | trim != hardening_crypto_policy
+  changed_when: true
+  notify: Reload sshd

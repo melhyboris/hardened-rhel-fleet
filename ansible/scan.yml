@@ -1,0 +1,83 @@
+---
+# Measures the fleet against the CIS profile and copies the reports to your machine.
+#   ansible-playbook scan.yml -e scan_label=before
+#   ansible-playbook scan.yml -e scan_label=after
+- name: Scan the fleet with OpenSCAP
+  hosts: fleet
+  gather_facts: true
+
+  vars:
+    scan_label: before
+    scan_dir: /var/tmp/oscap
+    scan_distro: "{{ 'rhel' if ansible_facts['distribution'] == 'RedHat' else ansible_facts['distribution'] | lower }}"
+    scan_content: "/usr/share/xml/scap/ssg/content/ssg-{{ scan_distro }}{{ ansible_facts['distribution_major_version'] }}-ds.xml"
+
+  tasks:
+    - name: Install the scanner and the security guide content
+      ansible.builtin.dnf:
+        name:
+          - openscap-scanner
+          - scap-security-guide
+        state: present
+
+    - name: Create the report directory on the server
+      ansible.builtin.file:
+        path: "{{ scan_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Run the scan (exit code 2 means some rules failed, which is expected)
+      ansible.builtin.command:
+        argv:
+          - oscap
+          - xccdf
+          - eval
+          - --profile
+          - "{{ scan_profile }}"
+          - --results
+          - "{{ scan_dir }}/{{ scan_label }}-results.xml"
+          - --report
+          - "{{ scan_dir }}/{{ scan_label }}-report.html"
+          - "{{ scan_content }}"
+      register: scan_run
+      changed_when: true
+      failed_when: scan_run.rc not in [0, 2]
+
+    - name: Read the score from the results file
+      ansible.builtin.shell:
+        cmd: >-
+          set -o pipefail;
+          grep -o '<score[^>]*>[0-9.]*' {{ scan_dir }}/{{ scan_label }}-results.xml
+          | head -n 1 | sed 's/.*>//'
+        executable: /bin/bash
+      register: scan_score
+      changed_when: false
+
+    - name: Count passed and failed rules
+      ansible.builtin.shell:
+        cmd: >-
+          echo "pass=$(grep -c '<result>pass</result>' {{ scan_dir }}/{{ scan_label }}-results.xml || true)
+          fail=$(grep -c '<result>fail</result>' {{ scan_dir }}/{{ scan_label }}-results.xml || true)"
+        executable: /bin/bash
+      register: scan_counts
+      changed_when: false
+
+    - name: Copy the HTML report to your machine
+      ansible.builtin.fetch:
+        src: "{{ scan_dir }}/{{ scan_label }}-report.html"
+        dest: "{{ reports_dir }}/{{ inventory_hostname }}/{{ scan_label }}-report.html"
+        flat: true
+
+    - name: Save the score next to the report
+      ansible.builtin.copy:
+        content: "{{ scan_score.stdout | trim }} {{ scan_counts.stdout | trim }}\n"
+        dest: "{{ reports_dir }}/{{ inventory_hostname }}/{{ scan_label }}.score"
+        mode: "0644"
+      delegate_to: localhost
+      become: false
+
+    - name: Show the result
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} {{ scan_label }}: score {{ scan_score.stdout | trim }}% ({{ scan_counts.stdout | trim }})"

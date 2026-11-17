@@ -1,0 +1,18 @@
+---
+base_packages:
+  - chrony
+  - firewalld
+  - audit
+  - rsyslog
+  - sudo
+  - cronie
+  - aide
+  - authselect
+  - libpwquality
+  - openscap-scanner
+  - scap-security-guide
+
+base_timezone: UTC
+
+base_banner: |
+  Authorized use only. Activity on this system is monitored and recorded.

@@ -1,0 +1,55 @@
+---
+- name: Apply kernel and network settings
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/60-hardening.conf
+    sysctl_set: true
+    state: present
+    reload: true
+  loop: "{{ hardening_sysctl | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Block kernel modules the servers do not need
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (role: hardening)
+      {% for module in hardening_blocked_modules %}
+      install {{ module }} /bin/false
+      blacklist {{ module }}
+      {% endfor %}
+    dest: /etc/modprobe.d/60-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Disable core dumps for all users
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (role: hardening)
+      * hard core 0
+    dest: /etc/security/limits.d/60-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create the systemd coredump drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/coredump.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Stop systemd from storing core dumps
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (role: hardening)
+      [Coredump]
+      Storage=none
+      ProcessSizeMax=0
+    dest: /etc/systemd/coredump.conf.d/60-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"

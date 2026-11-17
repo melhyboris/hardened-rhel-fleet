@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars (ignored by Git) and fill in.
+# Find your address with:  curl -s https://checkip.amazonaws.com
+admin_cidr     = "203.0.113.10/32"
+ssh_public_key = "ssh-ed25519 AAAA... you@laptop"
+
+# rhel9 adds Red Hat's per-hour fee on AWS. alma9 has no license fee.
+os             = "rhel9"
+instance_count = 3
+instance_type  = "t3.small"
+region         = "us-east-1"

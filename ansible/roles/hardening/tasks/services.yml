@@ -1,0 +1,50 @@
+---
+- name: Collect the list of installed services
+  ansible.builtin.service_facts:
+
+- name: Stop and mask services the servers do not need
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+    masked: true
+  loop: "{{ hardening_unneeded_services }}"
+  when: item in ansible_facts['services']
+
+- name: Create the journald drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Keep journal logs on disk and compressed
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (role: hardening)
+      [Journal]
+      Storage=persistent
+      Compress=yes
+      ForwardToSyslog=yes
+    dest: /etc/systemd/journald.conf.d/60-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart journald
+
+- name: Restrict cron configuration to root
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /etc/crontab, mode: "0600" }
+    - { path: /etc/cron.d, mode: "0700" }
+    - { path: /etc/cron.daily, mode: "0700" }
+    - { path: /etc/cron.hourly, mode: "0700" }
+    - { path: /etc/cron.weekly, mode: "0700" }
+    - { path: /etc/cron.monthly, mode: "0700" }
+  loop_control:
+    label: "{{ item.path }}"

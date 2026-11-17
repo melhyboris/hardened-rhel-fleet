@@ -1,0 +1,20 @@
+---
+# Checks skipped on purpose for a short-lived personal lab.
+# Each one is a real control that a production account should keep.
+framework:
+  - terraform
+quiet: true
+compact: true
+skip-check:
+  - CKV_AWS_18    # S3 access logging: needs a second bucket; not worth it for one state file
+  - CKV_AWS_144   # S3 cross-region replication: lab state is rebuildable
+  - CKV_AWS_145   # S3 KMS key: SSE-S3 is used to avoid a monthly KMS key charge
+  - CKV2_AWS_62   # S3 event notifications: nothing consumes them
+  - CKV_AWS_126   # EC2 detailed monitoring: billed per instance
+  - CKV_AWS_88    # EC2 public IP: servers are reached over SSH from one admin IP (no NAT or bastion)
+  - CKV2_AWS_41   # EC2 instance profile: instances call no AWS APIs
+  - CKV2_AWS_11   # VPC flow logs: needs CloudWatch or S3 storage
+  - CKV_AWS_130   # Subnet auto-assigns public IPs: same reason as CKV_AWS_88
+  - CKV_AWS_355   # ec2:* on the deploy role: limited to one region and one repo environment
+  - CKV_AWS_290   # same policy statement as CKV_AWS_355
+  - CKV_AWS_356   # ec2:Describe* on the plan role: describe actions do not support resource-level limits

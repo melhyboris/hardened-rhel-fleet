@@ -1,0 +1,52 @@
+---
+- name: Harden the fleet
+  hosts: fleet
+  serial: "{{ fleet_serial | default(1) }}"
+  gather_facts: true
+
+  roles:
+    - role: base
+      tags: [base]
+    - role: hardening
+      tags: [hardening]
+    - role: audit
+      tags: [audit]
+
+  post_tasks:
+    - name: Apply pending handlers before the reboot
+      ansible.builtin.meta: flush_handlers
+
+    - name: Reboot to load the kernel settings and lock the audit rules
+      ansible.builtin.reboot:
+        reboot_timeout: 600
+      when: hardening_reboot | bool
+      tags: [reboot]
+
+    - name: Read SELinux mode after the reboot
+      ansible.builtin.command: getenforce
+      register: verify_selinux
+      changed_when: false
+      tags: [verify]
+
+    - name: Read the effective SSH daemon settings
+      ansible.builtin.command: sshd -T
+      register: verify_sshd
+      changed_when: false
+      tags: [verify]
+
+    - name: Read the default firewall zone
+      ansible.builtin.command: firewall-cmd --get-default-zone
+      register: verify_zone
+      changed_when: false
+      tags: [verify]
+
+    - name: Confirm the server came back hardened
+      ansible.builtin.assert:
+        that:
+          - verify_selinux.stdout == 'Enforcing'
+          - "'permitrootlogin no' in verify_sshd.stdout"
+          - "'passwordauthentication no' in verify_sshd.stdout"
+          - verify_zone.stdout == hardening_firewall_zone
+        success_msg: "{{ inventory_hostname }} is back and hardened"
+        fail_msg: "{{ inventory_hostname }} failed a post-hardening check"
+      tags: [verify]

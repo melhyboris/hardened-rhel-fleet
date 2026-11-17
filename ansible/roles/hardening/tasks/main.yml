@@ -1,0 +1,18 @@
+---
+- name: Mandatory access control (SELinux)
+  ansible.builtin.import_tasks: selinux.yml
+
+- name: SSH daemon and crypto policy
+  ansible.builtin.import_tasks: ssh.yml
+
+- name: Host firewall
+  ansible.builtin.import_tasks: firewall.yml
+
+- name: Kernel and network settings
+  ansible.builtin.import_tasks: kernel.yml
+
+- name: Accounts, passwords and sudo
+  ansible.builtin.import_tasks: accounts.yml
+
+- name: Services, logging and file permissions
+  ansible.builtin.import_tasks: services.yml

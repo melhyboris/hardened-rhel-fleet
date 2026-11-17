@@ -1,0 +1,15 @@
+---
+# Dynamic inventory: Ansible finds the servers by tag, so there is no host list to edit.
+# Check it with:  ansible-inventory --graph
+plugin: amazon.aws.aws_ec2
+regions:
+  - us-east-1
+filters:
+  tag:Project: hardened-rhel-fleet
+  instance-state-name: running
+hostnames:
+  - tag:Name
+compose:
+  ansible_host: public_ip_address
+groups:
+  fleet: tags.Role is defined and tags.Role == 'fleet'

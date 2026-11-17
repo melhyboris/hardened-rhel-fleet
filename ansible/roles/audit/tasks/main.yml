@@ -1,0 +1,64 @@
+---
+- name: Enable the audit daemon
+  ansible.builtin.systemd_service:
+    name: auditd
+    enabled: true
+    state: started
+
+- name: Tune audit log retention
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: '^{{ item.key }}\s*='
+    line: "{{ item.key }} = {{ item.value }}"
+  loop:
+    - { key: max_log_file, value: "{{ audit_max_log_file_mb }}" }
+    - { key: max_log_file_action, value: "{{ audit_max_log_file_action }}" }
+    - { key: space_left_action, value: "{{ audit_space_left_action }}" }
+    - { key: admin_space_left_action, value: "{{ audit_admin_space_left_action }}" }
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Install the audit rules
+  ansible.builtin.copy:
+    src: 50-hardening.rules
+    dest: /etc/audit/rules.d/50-hardening.rules
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Load audit rules
+
+- name: Lock the audit configuration until the next reboot
+  ansible.builtin.copy:
+    content: |
+      ## Managed by Ansible (role: audit)
+      -e 2
+    dest: /etc/audit/rules.d/99-finalize.rules
+    owner: root
+    group: root
+    mode: "0600"
+  when: audit_immutable | bool
+  notify: Load audit rules
+
+- name: Build the file-integrity database (takes a few minutes the first time)
+  ansible.builtin.command:
+    cmd: aide --init
+    creates: /var/lib/aide/aide.db.new.gz
+
+- name: Activate the file-integrity database if none is active yet
+  ansible.builtin.copy:
+    src: /var/lib/aide/aide.db.new.gz
+    dest: /var/lib/aide/aide.db.gz
+    remote_src: true
+    force: false
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Check file integrity every day
+  ansible.builtin.cron:
+    name: aide-check
+    cron_file: aide-check
+    user: root
+    minute: "0"
+    hour: "5"
+    job: /usr/sbin/aide --check

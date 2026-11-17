@@ -1,0 +1,10 @@
+---
+# With immutable rules already loaded, new rules only take effect after a reboot,
+# so a failed reload is reported instead of failing the play.
+- name: Load audit rules
+  ansible.builtin.command: augenrules --load
+  register: audit_reload
+  changed_when: true
+  failed_when:
+    - audit_reload.rc != 0
+    - "'immutable' not in (audit_reload.stdout + audit_reload.stderr)"

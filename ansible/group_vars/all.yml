@@ -1,0 +1,9 @@
+---
+# Where scan reports land on your machine (ignored by Git).
+reports_dir: "{{ playbook_dir }}/../reports"
+
+# OpenSCAP profile to measure against. CIS Server Level 1 ships with scap-security-guide.
+scan_profile: xccdf_org.ssgproject.content_profile_cis_server_l1
+
+# Servers are hardened and rebooted one at a time, like a rolling maintenance window.
+fleet_serial: 1

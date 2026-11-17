@@ -1,0 +1,8 @@
+---
+# Lock the audit rules until the next reboot (-e 2). An attacker with root cannot switch auditing off quietly.
+audit_immutable: true
+
+audit_max_log_file_mb: 8
+audit_max_log_file_action: keep_logs
+audit_space_left_action: email
+audit_admin_space_left_action: single

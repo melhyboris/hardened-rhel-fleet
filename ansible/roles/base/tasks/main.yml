@@ -1,0 +1,39 @@
+---
+- name: Install baseline packages
+  ansible.builtin.dnf:
+    name: "{{ base_packages }}"
+    state: present
+
+- name: Set the time zone
+  community.general.timezone:
+    name: "{{ base_timezone }}"
+
+- name: Enable time sync, logging, cron and the firewall
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - chronyd
+    - rsyslog
+    - crond
+    - firewalld
+
+- name: Set the login banner
+  ansible.builtin.copy:
+    content: "{{ base_banner }}"
+    dest: "{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - /etc/issue
+    - /etc/issue.net
+
+- name: Clear the message of the day so it leaks no system details
+  ansible.builtin.copy:
+    content: ""
+    dest: /etc/motd
+    owner: root
+    group: root
+    mode: "0644"

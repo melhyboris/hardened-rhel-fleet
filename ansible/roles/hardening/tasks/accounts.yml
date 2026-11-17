@@ -1,0 +1,94 @@
+---
+- name: Set password aging defaults
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^#?\s*{{ item.key }}\s'
+    line: "{{ item.key }}\t{{ item.value }}"
+  loop:
+    - { key: PASS_MAX_DAYS, value: "{{ hardening_password_max_days }}" }
+    - { key: PASS_MIN_DAYS, value: "{{ hardening_password_min_days }}" }
+    - { key: PASS_WARN_AGE, value: "{{ hardening_password_warn_age }}" }
+    - { key: UMASK, value: "027" }
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Create the password quality drop-in directory
+  ansible.builtin.file:
+    path: /etc/security/pwquality.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Set password quality rules
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (role: hardening)
+      minlen = {{ hardening_password_min_length }}
+      minclass = 4
+      maxrepeat = 3
+      maxsequence = 3
+      dictcheck = 1
+      enforce_for_root
+    dest: /etc/security/pwquality.conf.d/60-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Set account lockout thresholds
+  ansible.builtin.lineinfile:
+    path: /etc/security/faillock.conf
+    regexp: '^#?\s*{{ item.key }}\s*='
+    line: "{{ item.key }} = {{ item.value }}"
+  loop:
+    - { key: deny, value: "{{ hardening_faillock_deny }}" }
+    - { key: unlock_time, value: "{{ hardening_faillock_unlock_time }}" }
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Set password history length
+  ansible.builtin.lineinfile:
+    path: /etc/security/pwhistory.conf
+    regexp: '^#?\s*remember\s*='
+    line: "remember = {{ hardening_password_history }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Read the active authselect profile
+  ansible.builtin.command: authselect current --raw
+  register: hardening_authselect_current
+  changed_when: false
+  failed_when: false
+  when: hardening_manage_authselect | bool
+
+- name: Enable account lockout and password history in PAM
+  ansible.builtin.command: authselect select sssd with-faillock with-pwhistory --force
+  when:
+    - hardening_manage_authselect | bool
+    - "'with-faillock' not in hardening_authselect_current.stdout or 'with-pwhistory' not in hardening_authselect_current.stdout"
+  changed_when: true
+
+- name: Log every sudo command and require a terminal
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (role: hardening)
+      Defaults use_pty
+      Defaults logfile="/var/log/sudo.log"
+    dest: /etc/sudoers.d/00-hardening
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Close idle shell sessions
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (role: hardening)
+      readonly TMOUT={{ hardening_shell_timeout }}
+      export TMOUT
+    dest: /etc/profile.d/tmout.sh
+    owner: root
+    group: root
+    mode: "0644"

@@ -1,0 +1,27 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+tfplan
+plan.txt
+
+# Ansible
+*.retry
+ansible/collections/
+
+# Scan reports hold hostnames and IP addresses: keep them out of Git
+reports/
+
+# Keys and local secrets
+*.pem
+*.key
+id_*
+.env
+
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
